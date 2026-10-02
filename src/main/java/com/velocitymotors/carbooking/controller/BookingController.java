@@ -21,12 +21,22 @@ public class BookingController {
         this.bookingService = bookingService;
     }
 
+    /**
+     *  API call for ConfirmBooking
+     * @param bookingRequest
+     * @return BookingResponse
+     */
     @PostMapping("/confirm")
     public ResponseEntity confirmBooking(@Valid @RequestBody BookingRequest bookingRequest) {
         BookingResponse response = bookingService.confirmBooking(bookingRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     *  API call for fetching the booking details using bookingId
+     * @param bookingId
+     * @return Booking
+     */
     @GetMapping("/{bookingId}")
     public ResponseEntity getBooking(@PathVariable String bookingId) {
         Booking booking = bookingService.getBooking(bookingId);

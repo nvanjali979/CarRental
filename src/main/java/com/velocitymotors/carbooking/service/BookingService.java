@@ -61,6 +61,9 @@ public class BookingService {
         return bookingRepository.save(booking);
     }
 
+    /**
+     * update BookingStatus depending on the payment mode
+     */
     private BookingStatus updateBookingStatus(BookingRequest bookingRequest) {
         return switch (bookingRequest.paymentMode()) {
             case DIGITAL_WALLET -> BookingStatus.CONFIRMED;
@@ -78,16 +81,24 @@ public class BookingService {
         };
     }
 
+    /**
+     *  Validate the Request for invalid rentalStartDate, vehicleId.
+     * @param bookingRequest
+     */
     private void validateRequest(BookingRequest bookingRequest) {
         bookingValidator.validateBookingDates(bookingRequest.rentalStartDate(), bookingRequest.rentalEndDate());
         bookingValidator.validateVehicleId(bookingRequest.vehicleId());
     }
 
+    /**
+     *  EventListener calls this method upon receiving the event BankTransferPaymentEvent
+     *  and changes the booking status to CONFIRMED     *
+     */
     @Transactional
     public void bankTransferPayment(String bookingID, BigDecimal totalAmount) {
         bookingRepository.findById(bookingID).ifPresentOrElse(booking -> {
                     if (booking.getBookingStatus().equals(BookingStatus.PENDING_PAYMENT) &&
-                            booking.getTotalAmount().equals(totalAmount)) {
+                            booking.getTotalAmount().compareTo(totalAmount) == 0) {
                         booking.setBookingStatus(BookingStatus.CONFIRMED);
                         logger.info("Booking {} is confirmed", booking.getBookingId());
                     } else {

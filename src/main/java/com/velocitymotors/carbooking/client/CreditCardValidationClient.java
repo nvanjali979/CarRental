@@ -30,9 +30,16 @@ public class CreditCardValidationClient {
                     .body(request)
                     .retrieve()
                     .body(PaymentStatusResponse.class);
+
+            if (response == null || response.status() == null) {
+                throw new CreditCardValidationException(
+                        "credit-card-validation-service returned an empty response for reference " + request.paymentReference(), null);
+            }
             return response;
         } catch (HttpClientErrorException.NotFound e) {
             throw new CreditCardValidationException("Credit card Service is down", e);
+        } catch (HttpClientErrorException e) {
+            throw new CreditCardValidationException("Invalid Request", e);
         }
 
     }

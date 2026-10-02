@@ -37,5 +37,6 @@ services:
       - kafka
       - credit-card-validation-service
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - CREDIT_CARD_VALIDATION_SERVICE_URL=http://credit-card-validation-service:8080/host/credit-card-payment-api
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CREDIT_CARD_VALIDATION_SERVICE_URL=http://credit-card-validation-service:9090/host/credit-card-payment-api
+      - BOOKING_API_KEY=my-secret-key

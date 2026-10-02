@@ -17,10 +17,13 @@ docker build -t car-booking-service .
 docker run -p 8080:8080 car-booking-service
 ```
 
-If you want to bring up the app together with its dependencies, try the below
+If you want to bring up the app together with its dependencies by using real kafka and
+mocking the external services, try the below
 ```
 docker compose up -d
 ```
+Actual Integration test that spins up the Kafka container via @Testcontainers/@Container
+that exercises the listener end-to-end are also included
 
 ## API
 
@@ -61,5 +64,19 @@ Response (`201 Created`):
 {
   "bookingId": "BKG0012345",
   "status": "PENDING_PAYMENT"
+}
+```
+
+### `GET /api/v1/actuator/health`
+
+Response (`200 OK`):
+
+```json
+{
+  "groups": [
+    "liveness",
+    "readiness"
+  ],
+  "status": "UP"
 }
 ```

@@ -13,6 +13,10 @@ public class BookingIDGenerator {
     private EntityManager entityManager;
 
 
+    /**
+     *  Generates BookingID according to Hibernate Sequence
+     *  booking_id_seq
+     */
     public String generateBookingID(){
         Number sequenceValue = (Number) entityManager
                 .createNativeQuery("SELECT NEXT VALUE FOR booking_id_seq")

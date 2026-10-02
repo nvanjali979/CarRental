@@ -12,7 +12,7 @@ spring:
         ddl-auto: create-drop
 
   kafka:
-    bootstrap-servers: localhost:9092 #${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: car-booking-service
       auto-offset-reset: earliest
@@ -52,5 +52,13 @@ car-booking:
 
 logging:
   level:
-    com.velocitymotors.carbooking: INFO
+    com.velocity-motors.car-booking: INFO
 
+security:
+  api-key: ${BOOKING_API_KEY:my-secret-key}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

@@ -1,0 +1,15 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/host/credit-card-payment-api/payment-status",
+    "bodyPatterns": [
+      { "matchesJsonPath": "$[?(@.paymentReference == 'REF-ERROR')]" }
+    ]
+  },
+  "response": {
+    "status": 500,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "error": "Internal server error" }
+  }
+}

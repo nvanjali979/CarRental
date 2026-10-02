@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: car-booking-service
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:carbookingdb;DB_CLOSE_DELAY=-1}
+    driver-class-name: ${DB_DRIVER:org.h2.Driver}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+
+    jpa:
+      hibernate:
+        ddl-auto: create-drop
+
+  kafka:
+    bootstrap-servers: localhost:9092 #${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: car-booking-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.velocitymotors.carbooking.dto
+        spring.json.value.default.type: com.velocitymotors.carbooking.dto.BankTransferPaymentEvent
+        spring.json.use.type.headers: false
+
+server:
+  port: 8082
+
+car-booking:
+  max-rent-days: 21
+
+  rental:
+    minBooking-hours: 48
+    zone-id: UTC
+
+  cancellation:
+    check-interval: 600000 #10 minutes
+
+  vehicle-pricing:
+    compact: 10
+    sedan: 15
+    suv: 20
+    luxury: 25
+
+  kafka:
+    bank-transfer-payment-events-topic: bank-transfer-payment-events
+
+
+  credit-card-validation:
+    base-URL: ${CREDIT_CARD_VALIDATION_SERVICE_URL:http://localhost:9090/host/credit-card-payment-api}
+    path: /payment-status
+
+logging:
+  level:
+    com.velocitymotors.carbooking: INFO
+

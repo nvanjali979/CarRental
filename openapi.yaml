@@ -1,0 +1,293 @@
+openapi: 3.0.3
+info:
+  title: Car Booking Service
+  description: >
+    API for creating and retrieving car rental bookings. Confirmation behavior depends on the
+    chosen payment mode: cash and digital-wallet payments are confirmed immediately, credit-card
+    payments are validated synchronously against an external credit-card-validation service, and
+    bank-transfer payments are left pending until a matching payment event is received over Kafka.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8082
+    description: Local development server
+
+tags:
+  - name: Bookings
+    description: Create and look up car rental bookings
+  - name: Monitoring
+    description: Operational health endpoints
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /api/v1/bookings/confirm:
+    post:
+      tags: [Bookings]
+      summary: Create and confirm a booking
+      description: >
+        Validates the rental dates and vehicle ID, calculates the rental price, resolves the
+        booking status for the chosen payment mode, and persists the booking.
+      operationId: confirmBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+            examples:
+              cashPayment:
+                summary: Cash payment (confirmed immediately)
+                value:
+                  customerName: "John"
+                  vehicleId: "NL123456"
+                  rentalStartDate: "2026-11-01"
+                  rentalEndDate: "2026-11-04"
+                  vehicleCategory: Sedan
+                  paymentMode: CASH
+              creditCardPayment:
+                summary: Credit card payment
+                value:
+                  customerName: "Alice"
+                  vehicleId: "NL654321"
+                  rentalStartDate: "2026-11-01"
+                  rentalEndDate: "2026-11-05"
+                  vehicleCategory: Luxury
+                  paymentMode: CREDIT_CARD
+              bankTransferPayment:
+                summary: Bank transfer payment (left pending until the payment event arrives)
+                value:
+                  customerName: "Bob"
+                  vehicleId: "NL111222"
+                  rentalStartDate: "2026-11-10"
+                  rentalEndDate: "2026-11-12"
+                  vehicleCategory: SUV
+                  paymentMode: BANK_TRANSFER
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+              examples:
+                confirmed:
+                  value:
+                    bookingID: "BKG0000001"
+                    bookingStatus: CONFIRMED
+                pendingPayment:
+                  value:
+                    bookingID: "BKG0000002"
+                    bookingStatus: PENDING_PAYMENT
+        '400':
+          description: >
+            Request validation failed (missing/invalid field) or the request body could not be
+            parsed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: The supplied vehicle ID is not in a valid format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionMessage'
+        '422':
+          description: The credit card payment was declined.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionMessage'
+        '503':
+          description: The credit-card-validation-service is unreachable or returned an error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionMessage'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/bookings/{bookingId}:
+    get:
+      tags: [Bookings]
+      summary: Get a booking by ID
+      operationId: getBooking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          description: Booking ID in the form `BKG` followed by a zero-padded sequence number.
+          schema:
+            type: string
+            example: "BKG0000001"
+      responses:
+        '200':
+          description: Booking found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No booking exists with the given ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExceptionMessage'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /actuator/health:
+    get:
+      tags: [Monitoring]
+      summary: Liveness/readiness health check
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: >
+        Static API key configured via the `security.api-key` property (`BOOKING_API_KEY`
+        environment variable in production). Not required for `/actuator/health`.
+
+  responses:
+    Unauthorized:
+      description: Missing or incorrect `X-API-KEY` header. No response body is returned.
+    InternalServerError:
+      description: An unexpected error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ExceptionMessage'
+
+  schemas:
+    VehicleCategory:
+      type: string
+      enum: [Compact, Sedan, SUV, Luxury]
+
+    PaymentMode:
+      type: string
+      enum: [CASH, DIGITAL_WALLET, CREDIT_CARD, BANK_TRANSFER]
+
+    BookingStatus:
+      type: string
+      enum: [PENDING_PAYMENT, CONFIRMED, CANCELLED]
+      description: >
+        CASH/DIGITAL_WALLET/approved CREDIT_CARD bookings start CONFIRMED; BANK_TRANSFER bookings
+        start PENDING_PAYMENT until a matching payment event is consumed from Kafka, and are
+        CANCELLED by a background job if unpaid too close to the rental start date.
+
+    BookingRequest:
+      type: object
+      required:
+        - customerName
+        - vehicleId
+        - rentalStartDate
+        - rentalEndDate
+        - vehicleCategory
+        - paymentMode
+      properties:
+        customerName:
+          type: string
+          description: Must be unique; limited to 10 characters by the database schema.
+          maxLength: 10
+          example: "John"
+        vehicleId:
+          type: string
+          description: Must match `^NL\d{6}$`.
+          pattern: '^NL\d{6}$'
+          example: "NL123456"
+        rentalStartDate:
+          type: string
+          format: date
+          description: Must be today or later.
+          example: "2026-11-01"
+        rentalEndDate:
+          type: string
+          format: date
+          description: >
+            Must be after rentalStartDate, and the rental period must not exceed the configured
+            maximum rent days
+          example: "2026-11-04"
+        vehicleCategory:
+          $ref: '#/components/schemas/VehicleCategory'
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+
+    BookingResponse:
+      type: object
+      properties:
+        bookingID:
+          type: string
+          example: "BKG0000001"
+        bookingStatus:
+          $ref: '#/components/schemas/BookingStatus'
+
+    Booking:
+      type: object
+      properties:
+        bookingId:
+          type: string
+          example: "BKG0000001"
+        customerName:
+          type: string
+          example: "John"
+        vehicleId:
+          type: string
+          example: "NL123456"
+        rentalStartDate:
+          type: string
+          format: date
+        rentalEndDate:
+          type: string
+          format: date
+        vehicleCategory:
+          $ref: '#/components/schemas/VehicleCategory'
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        bookingStatus:
+          $ref: '#/components/schemas/BookingStatus'
+        totalAmount:
+          type: number
+          format: decimal
+          example: 30
+
+    ExceptionMessage:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Request validation failed"
+        details:
+          type: array
+          items:
+            type: string
+          example: ["vehicleId: Vehicle ID is required"]
